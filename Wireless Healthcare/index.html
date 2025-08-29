@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Register - Wireless Healthcare System</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Firebase v9 Compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+  <!-- Firebase config -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAr7ZxKVWHtzTKa6ImWbNCIfjmnIbqqFpM",
+      authDomain: "wirelesshealthcare-a9812.firebaseapp.com",
+      projectId: "wirelesshealthcare-a9812",
+      storageBucket: "wirelesshealthcare-a9812.firebasestorage.app",
+      messagingSenderId: "14017133915",
+      appId: "1:14017133915:web:7c9735999bc5bb1e3eee7e",
+      databaseURL: "https://wirelesshealthcare-a9812-default-rtdb.firebaseio.com"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+  </script>
+
+  <!-- Registration logic -->
+  <script>
+    function register() {
+      const name = document.getElementById("regName").value.trim();
+      const age = document.getElementById("regAge").value.trim();
+      const email = document.getElementById("regEmail").value.trim();
+      const password = document.getElementById("regPassword").value;
+
+      if (!name || !age || !email || !password) {
+        alert("Please fill out all fields.");
+        return;
+      }
+
+      firebase.auth().createUserWithEmailAndPassword(email, password)
+        .then(userCredential => {
+          const uid = userCredential.user.uid;
+          return firebase.database().ref("users/" + uid).set({
+            name: name,
+            age: age,
+            email: email
+          });
+        })
+        .then(() => {
+          alert("Registration successful! Please login.");
+          window.location.href = "login.html";  // Redirect to login page
+        })
+        .catch(error => {
+          alert("Error: " + error.message);
+        });
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <!-- Healthcare-themed left section -->
+    <div class="healthcare-info">
+      <img src="heartbeat.jpg" class="healthcare-icon" alt="Heartbeat Icon" />
+      <h3>Welcome to Wireless Healthcare</h3>
+      <p>
+        Empowering patients and doctors through innovative wireless health
+        solutions. Take control of your health with real-time monitoring and
+        guidance from medical professionals.
+      </p>
+    </div>
+
+    <!-- Registration form -->
+    <div class="form">
+      <h2>Wireless Healthcare System - Register</h2>
+      <h3>Create an Account</h3>
+      <input type="text" id="regName" placeholder="Name" />
+      <input type="number" id="regAge" placeholder="Age" />
+      <input type="email" id="regEmail" placeholder="Email" />
+      <input type="password" id="regPassword" placeholder="Password" />
+      <button onclick="register()">Register</button>
+      <p>
+        Already have an account?
+        <a href="login.html">Login here</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>

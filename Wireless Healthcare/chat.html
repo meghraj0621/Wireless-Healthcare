@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chat with Doctor</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      background-color: #f4f7fa;
+    }
+
+    .chat-container {
+      max-width: 600px;
+      margin: 50px auto;
+      background-color: #fff;
+      padding: 20px 30px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+      position: relative;
+    }
+
+    .back-button {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      text-decoration: none;
+      color: #0077cc;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .chat-box {
+      height: 350px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin-top: 20px;
+      margin-bottom: 15px;
+      border-radius: 6px;
+      background-color: #f9f9f9;
+    }
+
+    .message {
+      margin: 10px 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .message span.name {
+      font-weight: bold;
+    }
+
+    .message.user {
+      align-items: flex-end;
+    }
+
+    .message.doctor {
+      align-items: flex-start;
+    }
+
+    .message-content {
+      background: #e6f0fa;
+      padding: 10px 12px;
+      border-radius: 8px;
+      max-width: 75%;
+    }
+
+    .user .message-content {
+      background-color: #d0e8ff;
+      color: #003366;
+    }
+
+    .doctor .message-content {
+      background-color: #e4f7ea;
+      color: #084d24;
+    }
+
+    .timestamp {
+      font-size: 11px;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    .input-area {
+      display: flex;
+      gap: 10px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    button {
+      background-color: #0077cc;
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background-color: #005fa3;
+    }
+
+    h2 {
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="chat-container">
+    <a href="dashboard.html" class="back-button">← Back to Dashboard</a>
+
+    <h2>Chat with a Doctor</h2>
+    <p>Start a chat with our healthcare expert. Please describe your symptoms clearly for accurate suggestions.</p>
+
+    <div class="chat-box" id="chatBox"></div>
+
+    <div class="input-area">
+      <input type="text" id="userInput" placeholder="Type your message..." onkeypress="if(event.key==='Enter') sendMessage()">
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script>
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyAr7ZxKVWHtzTKa6ImWbNCIfjmnIbqqFpM",
+      authDomain: "wirelesshealthcare-a9812.firebaseapp.com",
+      projectId: "wirelesshealthcare-a9812",
+      storageBucket: "wirelesshealthcare-a9812.firebasestorage.app",
+      messagingSenderId: "14017133915",
+      appId: "1:14017133915:web:7c9735999bc5bb1e3eee7e"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+  </script>
+
+  <script>
+    let lastDoctorQuestion = null;
+
+    function getTime() {
+      const now = new Date();
+      return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function appendMessage(sender, text) {
+      const chatBox = document.getElementById("chatBox");
+      const messageDiv = document.createElement("div");
+      messageDiv.className = `message ${sender}`;
+
+      messageDiv.innerHTML = `
+        <span class="message-content">
+          <span class="name">${sender === 'user' ? 'You' : 'Doctor'}:</span> ${text}
+          <div class="timestamp">${getTime()}</div>
+        </span>
+      `;
+
+      chatBox.appendChild(messageDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function getDoctorReply(userMessage) {
+      const msg = userMessage.toLowerCase();
+
+      if (lastDoctorQuestion) {
+        if (msg === "yes") {
+          const reply = handleYesResponse(lastDoctorQuestion);
+          lastDoctorQuestion = null;
+          return reply;
+        } else if (msg === "no") {
+          const reply = handleNoResponse(lastDoctorQuestion);
+          lastDoctorQuestion = null;
+          return reply;
+        }
+      }
+
+      if (msg.includes("fever") || msg.includes("temperature")) {
+        lastDoctorQuestion = "feverFollowUp";
+        return "It seems like you're experiencing a fever. Are you also having chills or body aches?";
+      } else if (msg.includes("headache")) {
+        lastDoctorQuestion = "headacheFollowUp";
+        return "A headache could be caused by stress or dehydration. Are you drinking enough water?";
+      } else if (msg.includes("cough")) {
+        lastDoctorQuestion = "coughFollowUp";
+        return "For a cough, warm fluids and cough syrup like Benadryl can help. Is it dry or with mucus?";
+      } else if (msg.includes("cold")) {
+        lastDoctorQuestion = "coldFollowUp";
+        return "A common cold usually resolves in 5–7 days. Rest well and stay hydrated. Any sore throat?";
+      } else if (msg.includes("stomach") || msg.includes("diarrhea")) {
+        lastDoctorQuestion = "stomachFollowUp";
+        return "For stomach issues, try drinking ORS solution and avoid spicy food. How long has it been ongoing?";
+      } else {
+        lastDoctorQuestion = null;
+        return "Thank you for reaching out. Can you please describe your symptoms more specifically?";
+      }
+    }
+
+    function handleYesResponse(context) {
+      switch (context) {
+        case "headacheFollowUp":
+          return "That's good. Continue hydrating and rest well. If the headache persists, consider a mild pain reliever.";
+        case "feverFollowUp":
+          return "Chills and body aches are common with fever. Monitor your temperature and rest well.";
+        default:
+          return "Thanks for confirming. Let me know if you experience any changes.";
+      }
+    }
+
+    function handleNoResponse(context) {
+      switch (context) {
+        case "headacheFollowUp":
+          return "You should increase your water intake. Dehydration is a common cause of headaches.";
+        case "feverFollowUp":
+          return "If you're not having chills or aches, it might be a mild fever. Still, keep an eye on it.";
+        default:
+          return "Alright. Please share more details if anything changes.";
+      }
+    }
+
+    function sendMessage() {
+      const input = document.getElementById("userInput");
+      const message = input.value.trim();
+      if (!message) return;
+
+      appendMessage("user", message);
+      input.value = "";
+
+      setTimeout(() => {
+        appendMessage("doctor", "Typing...");
+      }, 500);
+
+      setTimeout(() => {
+        const chatBox = document.getElementById("chatBox");
+        const lastMsg = chatBox.lastChild;
+        if (lastMsg && lastMsg.classList.contains("doctor")) {
+          chatBox.removeChild(lastMsg);
+        }
+        const reply = getDoctorReply(message);
+        appendMessage("doctor", reply);
+      }, 1500);
+    }
+  </script>
+
+</body>
+</html>

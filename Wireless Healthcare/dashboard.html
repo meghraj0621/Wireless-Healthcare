@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dashboard - Wireless Healthcare System</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Segoe+UI&display=swap">
+  
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+  <!-- PDF Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- Firebase Config -->
+  <script src="firebase-config.js"></script>
+
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      background-color: #f4f7fa;
+    }
+
+    header {
+      background-color: #0077cc;
+      color: white;
+      padding: 15px 25px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    header h2 {
+      margin: 0;
+      flex: 1;
+      text-align: center;
+      font-size: 20px;
+    }
+
+    .btn {
+      background-color: white;
+      color: #0077cc;
+      border: none;
+      padding: 8px 16px;
+      margin: 5px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .btn:hover {
+      background-color: #e3f0fc;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 30px auto;
+      padding: 20px;
+      background-color: white;
+      border-radius: 12px;
+      box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .profile,
+    #medicineSection,
+    #pastCheckupsSection {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+    }
+
+    textarea {
+      width: 100%;
+      height: 90px;
+      padding: 10px;
+      font-size: 14px;
+      margin: 10px 0;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      resize: none;
+    }
+
+    h3 {
+      margin-bottom: 8px;
+    }
+
+    #pastCheckupsSection ul {
+      padding-left: 20px;
+      list-style-type: square;
+    }
+
+    hr {
+      border: 0;
+      height: 1px;
+      background: #ccc;
+      margin: 10px 0;
+    }
+
+    .btn img {
+      height: 16px;
+      width: 16px;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    .profile img {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: block;
+      margin: 0 auto 10px auto;
+    }
+
+    @media (max-width: 600px) {
+      header {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      header h2 {
+        font-size: 18px;
+      }
+
+      .btn {
+        width: 100%;
+        margin: 5px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <button class="btn" onclick="showProfile()">
+      <img src="profile.png" alt="Profile Icon">My Profile
+    </button>
+    <button class="btn" onclick="viewPastCheckups()">Past Checkups</button>
+    <h2>Wireless Healthcare System</h2>
+    <button class="btn" onclick="logout()">Logout</button>
+  </header>
+
+  <div class="container">
+    <div class="profile" id="profileSection" style="display: none;"></div>
+
+    <form id="symptomForm">
+      <h3>Enter your symptoms:</h3>
+      <textarea id="symptoms" placeholder="e.g., fever, cough, headache..." required></textarea>
+      <button type="button" class="btn" onclick="suggestMedicine()">Suggest Medicine</button>
+    </form>
+
+    <div id="medicineSection"></div>
+
+    <button type="button" class="btn" onclick="downloadPDF()">Download PDF Report</button>
+    <button type="button" class="btn" onclick="downloadPastCheckupsPDF()">Download Past Checkups</button>
+    <button type="button" class="btn" onclick="consultWithDoctor()">Consult with Doctor</button>
+
+    <div id="pastCheckupsSection" style="display: none;"></div>
+  </div>
+
+  <script>
+    let currentUser, userInfo = {};
+
+    firebase.auth().onAuthStateChanged(user => {
+      if (!user) return window.location.href = "index.html";
+      currentUser = user;
+
+      firebase.database().ref("users/" + user.uid).once("value").then(snapshot => {
+        userInfo = snapshot.val();
+        document.getElementById("profileSection").innerHTML = `
+          <img src="profile.png" alt="Profile Picture">
+          <strong>Name:</strong> ${userInfo.name}<br>
+          <strong>Age:</strong> ${userInfo.age}<br>
+          <strong>Email:</strong> ${userInfo.email}
+        `;
+      });
+    });
+
+    function showProfile() {
+      const section = document.getElementById('profileSection');
+      section.style.display = section.style.display === "none" ? "block" : "none";
+    }
+
+    function logout() {
+      firebase.auth().signOut().then(() => {
+        window.location.href = "index.html";
+      });
+    }
+
+    function suggestMedicine() {
+      const symptomsInput = document.getElementById("symptoms").value.toLowerCase().trim();
+      if (!symptomsInput) {
+        alert("Please enter symptoms.");
+        return;
+      }
+
+      const symptomList = symptomsInput.split(',').map(s => s.trim());
+      const medicineMap = {
+        fever: "Paracetamol",
+        cold: "Cetrizine",
+        cough: "Benadryl",
+        headache: "Ibuprofen",
+        vomiting: "Domperidone",
+        nausea: "Ondansetron",
+        diarrhea: "ORS",
+        bodyache: "Dolo 650"
+      };
+
+      const suggested = [];
+
+      symptomList.forEach(symptom => {
+        for (const key in medicineMap) {
+          if (symptom.includes(key)) {
+            suggested.push(medicineMap[key]);
+            break;
+          }
+        }
+      });
+
+      const uniqueMedicines = [...new Set(suggested)];
+      const medicineText = uniqueMedicines.length > 0 ? uniqueMedicines.join(', ') : "Please consult a doctor.";
+
+      document.getElementById("medicineSection").innerHTML =
+        `<strong>Suggested Medicine(s):</strong> ${medicineText}`;
+
+      const now = new Date();
+      const checkupData = {
+        name: userInfo.name,
+        age: userInfo.age,
+        symptoms: symptomsInput,
+        medicine: medicineText,
+        dateTime: now.toLocaleString()
+      };
+
+      firebase.database().ref(`pastCheckups/${currentUser.uid}`).push(checkupData);
+      userInfo.symptoms = symptomsInput;
+      userInfo.medicine = medicineText;
+    }
+
+    function viewPastCheckups() {
+      const section = document.getElementById("pastCheckupsSection");
+      section.style.display = section.style.display === "none" ? "block" : "none";
+      section.innerHTML = "<strong>Loading past checkups...</strong>";
+
+      firebase.database().ref(`pastCheckups/${currentUser.uid}`).once("value").then(snapshot => {
+        const data = snapshot.val();
+        if (!data) {
+          section.innerHTML = "<em>No past checkups found.</em>";
+          return;
+        }
+
+        let html = "<h4>Past Checkups</h4><ul>";
+        Object.values(data).forEach(entry => {
+          html += `<li>
+            <strong>Date:</strong> ${entry.dateTime}<br>
+            <strong>Symptoms:</strong> ${entry.symptoms}<br>
+            <strong>Medicine:</strong> ${entry.medicine}<br><hr>
+          </li>`;
+        });
+        html += "</ul>";
+        section.innerHTML = html;
+      });
+    }
+
+    async function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const now = new Date();
+
+      doc.setFontSize(16);
+      doc.text("Wireless Healthcare System", 20, 20);
+      doc.setFontSize(10);
+      doc.text(`Date: ${now.toLocaleDateString()} Time: ${now.toLocaleTimeString()}`, 20, 30);
+      doc.text(`Name: ${userInfo.name}`, 20, 40);
+      doc.text(`Age: ${userInfo.age}`, 20, 50);
+      doc.text(`Email: ${userInfo.email}`, 20, 60);
+      doc.text("Symptoms:", 20, 70);
+      doc.text(userInfo.symptoms || "N/A", 30, 80);
+      doc.text("Suggested Medicine:", 20, 90);
+      doc.text(userInfo.medicine || "N/A", 30, 100);
+      doc.text("Note from Doctor:", 20, 110);
+      doc.text("Please consult a doctor if symptoms persist.", 30, 120);
+
+      const fileName = `${userInfo.name.replace(/\s+/g, '_')}_Health_Report.pdf`;
+      doc.save(fileName);
+    }
+
+    async function downloadPastCheckupsPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const now = new Date();
+
+      doc.setFontSize(16);
+      doc.text("Past Checkups Report", 20, 20);
+      doc.setFontSize(10);
+      doc.text(`Date: ${now.toLocaleDateString()} Time: ${now.toLocaleTimeString()}`, 20, 30);
+
+      firebase.database().ref(`pastCheckups/${currentUser.uid}`).once("value").then(snapshot => {
+        const data = snapshot.val();
+        if (!data) {
+          doc.text("No past checkups found.", 20, 40);
+          doc.save(`${userInfo.name.replace(/\s+/g, '_')}_Past_Checkups_Report.pdf`);
+          return;
+        }
+
+        let y = 40;
+        Object.values(data).forEach(entry => {
+          doc.text(`Date: ${entry.dateTime}`, 20, y += 10);
+          doc.text(`Symptoms: ${entry.symptoms}`, 20, y += 10);
+          doc.text(`Medicine: ${entry.medicine}`, 20, y += 10);
+          y += 10;
+        });
+
+        doc.save(`${userInfo.name.replace(/\s+/g, '_')}_Past_Checkups_Report.pdf`);
+      });
+    }
+
+    function consultWithDoctor() {
+      window.location.href = "chat.html";
+    }
+  </script>
+
+</body>
+</html>
